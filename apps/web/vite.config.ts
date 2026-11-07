@@ -45,6 +45,27 @@ function inlineWattPackageMetadata(): Plugin {
   };
 }
 
+function bundleWattTracer(): Plugin {
+  return {
+    name: "bundle-watt-tracer",
+    enforce: "pre",
+    transform(source, id) {
+      if (!id.endsWith("/node_modules/@platformatic/telemetry/lib/platformatic-trace-provider.js"))
+        return;
+      const lookup = "const { Tracer } = require('@opentelemetry/sdk-trace/build/src/Tracer')";
+      if (!source.includes(lookup))
+        this.error("Watt tracer loader changed; update the bundle integration");
+      return {
+        code: source.replace(
+          lookup,
+          "import { Tracer } from '@opentelemetry/sdk-trace/build/src/Tracer.js'",
+        ),
+        map: null,
+      };
+    },
+  };
+}
+
 function skipCurrentWattMigrations(): Plugin {
   return {
     name: "skip-current-watt-migrations",
@@ -131,6 +152,7 @@ export default defineConfig(({ isSsrBuild }) => ({
           bundleWattCapabilityResolver(),
           exportWattGlobals(),
           skipCurrentWattMigrations(),
+          bundleWattTracer(),
         ]
       : []),
     babel({ parserOpts: { plugins: ["typescript", "jsx"] }, plugins: ["babel-plugin-relay"] }),

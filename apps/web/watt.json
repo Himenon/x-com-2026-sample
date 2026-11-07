@@ -10,7 +10,8 @@
   "runtime": {
     "workers": 2,
     "telemetry": {
-      "enabled": false
+      "enabled": false,
+      "applicationName": "town-square-sample"
     }
   }
 }
