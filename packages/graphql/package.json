@@ -1,0 +1,11 @@
+{
+  "name": "@sample/graphql",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts",
+  "dependencies": {
+    "@graphql-tools/schema": "^11.0.8",
+    "@sample/database": "workspace:*",
+    "graphql": "^17.1.0"
+  }
+}

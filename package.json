@@ -1,0 +1,31 @@
+{
+  "name": "town-square-stack-sample",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "relay": "relay-compiler",
+    "build": "pnpm relay && pnpm --filter @sample/web build && pnpm --filter @sample/web build:watt",
+    "dev": "pnpm build && pnpm --filter @sample/web start:watt",
+    "typecheck": "pnpm relay && tsrs --noEmit",
+    "lint": "oxlint .",
+    "format": "oxfmt .",
+    "format:check": "oxfmt --check ."
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "@types/pg": "^8.23.1",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@types/react-relay": "^18.2.1",
+    "@types/relay-runtime": "^20.1.1",
+    "oxfmt": "^0.76.0",
+    "oxlint": "^1.91.0",
+    "relay-compiler": "^21.0.1",
+    "tsrs": "0.22.0-ts7.1.0-beta",
+    "typescript": "^7.0.2"
+  },
+  "engines": {
+    "node": ">=26"
+  },
+  "packageManager": "pnpm@12.18.0"
+}

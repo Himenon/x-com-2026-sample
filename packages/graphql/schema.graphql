@@ -1,0 +1,30 @@
+type Profile {
+  id: ID!
+  name: String!
+  handle: String!
+  bio: String!
+}
+
+type Post {
+  id: ID!
+  author: Profile!
+  body: String!
+  createdAt: String!
+  likes: Int!
+}
+
+type Stats {
+  postCount: Int!
+  totalLikes: Int!
+  cache: String!
+}
+
+type Query {
+  profile: Profile!
+  posts: [Post!]!
+  stats: Stats!
+}
+
+type Mutation {
+  likePost(id: ID!): Post!
+}

@@ -1,0 +1,16 @@
+{
+  "module": "@platformatic/service",
+  "server": {
+    "hostname": "0.0.0.0",
+    "port": "{PORT}"
+  },
+  "plugins": {
+    "paths": ["./dist/server/server.js"]
+  },
+  "runtime": {
+    "workers": 2,
+    "telemetry": {
+      "enabled": false
+    }
+  }
+}

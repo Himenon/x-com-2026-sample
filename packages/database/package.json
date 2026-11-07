@@ -1,0 +1,10 @@
+{
+  "name": "@sample/database",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts",
+  "dependencies": {
+    "pg": "^8.23.1",
+    "redis": "^6.3.1"
+  }
+}

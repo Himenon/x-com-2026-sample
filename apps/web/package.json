@@ -1,0 +1,35 @@
+{
+  "name": "@sample/web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build --outDir dist/client && vite build --ssr src/bootstrap.ts --outDir dist/server && vite build --ssr src/server.tsx --outDir dist/server --emptyOutDir false && cp ../../packages/graphql/schema.graphql dist/server/schema.graphql",
+    "start": "node --experimental-default-type=module dist/server/bootstrap.js",
+    "start:watt": "wattpm start",
+    "build:watt": "node scripts/build-watt.mjs",
+    "start:watt:bundle": "node --experimental-default-type=module dist/watt/start.mjs"
+  },
+  "dependencies": {
+    "@fastify/static": "^10.1.10",
+    "@platformatic/service": "^3.77.0",
+    "@sample/database": "workspace:*",
+    "@sample/graphql": "workspace:*",
+    "@sample/ui": "workspace:*",
+    "fastify": "^5.12.8",
+    "graphql": "^17.1.0",
+    "mercurius": "^16.12.1",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "react-relay": "^21.0.1",
+    "relay-runtime": "^21.0.1",
+    "wattpm": "^3.77.0"
+  },
+  "devDependencies": {
+    "@rolldown/plugin-babel": "^0.3.0",
+    "@tailwindcss/vite": "^4.3.4",
+    "@vitejs/plugin-react": "^6.2.1",
+    "babel-plugin-relay": "^21.0.1",
+    "tailwindcss": "^4.3.4",
+    "vite": "^8.3.6"
+  }
+}

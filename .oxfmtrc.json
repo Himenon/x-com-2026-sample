@@ -1,0 +1,3 @@
+{
+  "ignorePatterns": ["**/dist/**", "**/__generated__/**", "pnpm-lock.yaml", "PLAN.md"]
+}
