@@ -52,8 +52,7 @@ export async function posts() {
 }
 
 export async function stats() {
-  // A versioned key prevents an in-flight cache miss from restoring stale data
-  // after a mutation invalidates the previous generation.
+  // バージョン付きキーを使い、更新前から実行中の集計が古いキャッシュを復活させるのを防ぐ。
   const version = (await cache.get("stats:version")) ?? "0";
   const key = `stats:${version}`;
   const cached = await cache.get(key);
@@ -71,6 +70,7 @@ export async function likePost(id: string) {
     [id],
   );
   if (!rows[0]) throw new Error("Post not found");
+  // いいね数の更新後にバージョンを進め、以前の集計キャッシュを参照しないようにする。
   await cache.incr("stats:version");
   return { ...rows[0], createdAt: rows[0].createdAt.toISOString() };
 }

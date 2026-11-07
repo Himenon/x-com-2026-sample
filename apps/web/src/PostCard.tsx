@@ -46,6 +46,7 @@ export function PostCard({ post }: { post: PostCard_post$key }) {
             onClick={() =>
               like({
                 variables: { id: data.id },
+                // 投稿の更新後に集計を別途取得し、画面上の合計を更新する。
                 onCompleted: () => {
                   window.dispatchEvent(new Event("stats:refresh"));
                 },

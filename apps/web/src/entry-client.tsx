@@ -16,8 +16,7 @@ const initialPosts =
   "data" in response && response.data && Array.isArray(response.data.posts)
     ? response.data.posts.length
     : 0;
-// Wait for the streamed document to finish so hydration sees the server's
-// success or error result without issuing the delayed query a second time.
+// ストリームの完了を待って遅延領域の成功・失敗を引き継ぎ、同じクエリの再実行を避ける。
 const ready = new Promise<number>((resolve) => {
   const finish = () =>
     resolve(document.querySelector('[data-stream-error="true"]') ? -1 : initialPosts);
@@ -38,6 +37,7 @@ function hydrate() {
   );
   return true;
 }
+// スクリプトが早く到着した場合は、描画対象の要素が追加されてからハイドレーションする。
 if (!hydrate()) {
   const observer = new MutationObserver(() => {
     if (hydrate()) observer.disconnect();

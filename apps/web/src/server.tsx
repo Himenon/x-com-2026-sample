@@ -13,6 +13,7 @@ import { schema } from "@sample/graphql";
 import { App } from "./App";
 import { createRelayEnvironment, HomeQuery } from "./relay";
 
+// HTML に埋め込む JSON をエスケープし、データをスクリプトとして解釈させない。
 const escapeJson = (value: unknown) =>
   JSON.stringify(value)
     .replace(/</g, "\\u003c")
@@ -45,6 +46,7 @@ export default async function app(server: FastifyInstance) {
     }
   });
   server.get("/", async (_request, reply) => {
+    // 遅延クエリ用のタイマーを先に開始し、Suspense のストリーミング表示を再現する。
     const slow = new Promise<void>((done) => setTimeout(done, 1500))
       .then(async () => {
         const result = await executeGraphql({ schema, source: "{ posts { id } }" });
@@ -61,6 +63,7 @@ export default async function app(server: FastifyInstance) {
     if (!source) throw new Error("Home query has no text");
     const initial = await executeGraphql({ schema, source });
     if (initial.errors || !initial.data) throw new Error("Unable to load initial page data");
+    // サーバー側で取得したクエリ結果を Relay ストアに投入し、描画時の再取得を避ける。
     const environment = createRelayEnvironment({ data: initial.data });
     const css = (entry.css ?? [])
       .map((file: string) => `<link rel="stylesheet" href="/${file}">`)
@@ -72,6 +75,7 @@ export default async function app(server: FastifyInstance) {
     reply.raw.write(
       `<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Town Square / Lab</title>${css}${bootstrap}</head><body><div id="root">`,
     );
+    // HTML を分割して送り、遅延領域の完了後に文書を閉じる。
     const output = new PassThrough();
     output.pipe(reply.raw, { end: false });
     output.on("end", () => reply.raw.end("</div></body></html>"));
