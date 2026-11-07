@@ -2,6 +2,7 @@ import { graphql, useFragment, useMutation } from "react-relay";
 import type { PostCard_post$key } from "./__generated__/PostCard_post.graphql";
 import type { PostCardLikeMutation } from "./__generated__/PostCardLikeMutation.graphql";
 
+// 記事と同様に、コンポーネントが必要とするフィールドをフラグメントで宣言する。
 const postFragment = graphql`
   fragment PostCard_post on Post {
     id

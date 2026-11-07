@@ -2,6 +2,42 @@
 
 X の技術スタックを参考にした、1 ページの実装サンプルです。React のストリーミング SSR、Relay と GraphQL、Fastify と Watt、PostgreSQL と Redis の接続を確認できます。
 
+## 記事と実装の対応
+
+参考記事: [Rebuilding the global town square from scratch](https://blog.x.com/en/engineering/rebuilding-the-global-town-square-from-scratch)
+
+記事の構成を小さなサンプルに置き換えています。「一部再現」は、同じ考え方を使いながら対象や実装を簡略化したものです。
+
+| 記事で紹介された技術                                | このサンプルでの対応                                                                                                                                                                                                             | 実装箇所                                                                                                                                  |
+| --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Vite・Rolldown によるクライアントとサーバーのビルド | 採用。ブラウザ用、SSR 用、Watt のランタイムとワーカー用に成果物を作ります。記事にあるログイン前後のエントリーポイント分割はありません。                                                                                          | [ビルド設定](apps/web/package.json)、[Vite 設定](apps/web/vite.config.ts)、[Watt のビルド](apps/web/scripts/build-watt.mjs)               |
+| Watt のワーカースレッドと Fastify                   | 一部再現。Watt が2つのワーカーを起動し、Fastify が HTTP を処理します。記事のようなイベントループやメモリの上限に基づくワーカー交換は設定していません。                                                                           | [Watt 設定](apps/web/watt.json)、[サーバー](apps/web/src/server.tsx)                                                                      |
+| React のストリーミング SSR と Suspense              | 一部再現。シェルを送った後に遅延領域を送ります。遅延を確認できるよう、サンプルではタイマーを使っています。初期クエリは HTML の送信前に完了を待ちます。                                                                           | [SSR](apps/web/src/routes/home.tsx)、[Suspense 境界](apps/web/src/App.tsx)                                                                |
+| ルートごとのデータ取得                              | 一部再現。`/` の処理が描画に必要な GraphQL クエリを実行します。記事のような複数ルートのローダーや、画面遷移時の先読みはありません。                                                                                              | [ホームルート](apps/web/src/routes/home.tsx)、[HomeQuery](apps/web/src/relay.ts)                                                          |
+| GraphQL と Relay のフラグメント                     | 採用。ページのクエリと投稿カードのフラグメントで必要なデータを宣言し、いいねには mutation を使います。                                                                                                                           | [HomeQuery](apps/web/src/relay.ts)、[投稿カード](apps/web/src/PostCard.tsx)、[スキーマ](packages/graphql/schema.graphql)                  |
+| SSR で取得した GraphQL レスポンスの再利用           | 一部再現。初期クエリのレスポンスを HTML に埋め込み、ブラウザ側の Relay ストアに投入して初回の重複取得を避けます。記事のように複数のレスポンスを順次再生したり、未読レスポンスを30秒保持したりする仕組みはありません。            | [HTML への埋め込み](apps/web/src/routes/home.tsx)、[Relay ストア](apps/web/src/relay.ts)、[ブラウザの入口](apps/web/src/entry-client.tsx) |
+| ストリーム中のハイドレーション                      | 一部再現。非同期の module script を読み込み、DOM に描画対象が現れたらシェルのハイドレーションを開始します。遅延領域の結果は文書の完了後に引き継ぎます。記事の CSS 読み込み完了後に JavaScript の取得を始める最適化はありません。 | [スクリプトの出力](apps/web/src/routes/home.tsx)、[ハイドレーション](apps/web/src/entry-client.tsx)                                       |
+| XDS と Base UI・Tailwind CSS                        | 一部再現。非公開の XDS は使わず、Base UI のダイアログと Tailwind CSS のビルド連携を使います。画面のスタイルは主に通常の CSS で定義しています。                                                                                   | [共通 UI](packages/ui/src/index.tsx)、[CSS](apps/web/src/styles.css)、[Vite 設定](apps/web/vite.config.ts)                                |
+| tsrs と oxlint                                      | 採用。tsrs で型検査、oxlint で lint を実行します。記事の独自 lint ルールや Git フックは実装していません。                                                                                                                        | [スクリプト](package.json)、[CI](.github/workflows/ci.yml)                                                                                |
+
+### 採用・再現していないもの
+
+次の機能や最適化は、単一ページで技術の使い方を確認する今回の範囲には含めていません。一部は上の表にある技術との差分です。
+
+- **検索クローラー向けの専用応答**: IP アドレスによるクローラーの検証、全 `Suspense` 境界を解決した HTML、構造化データ、多言語の代替 URL、クローラー向けの JS 除外は実装していません。
+- **リンクプレビュー専用の応答と画像生成**: ボット向けに本文の描画やタイムラインの取得を省く経路と、Rust でプレビュー画像を生成するサービスはありません。
+- **既存サービスからの移行**: 旧サーバーとのレスポンス比較、URL の修復・互換性維持、エッジでの振り分け、国別の段階的移行や機能スイッチはありません。移行元となるサービスがないためです。
+- **X 独自のサーバーパッケージとゲスト処理**: 記事の `@x-clients/server` は使わず、Fastify の設定をこのリポジトリで組み立てています。ゲストトークンと機能フラグの取得・並列化もありません。
+- **複数ページと認証状態別の配信**: 画面は `/` だけで、ログイン機能やログイン前後の JavaScript エントリーポイント分割はありません。記事のホバー・フォーカスなどを使った画面遷移前のコードとデータの先読みもありません。
+- **ルートローダーとレスポンスの再生**: 初期クエリは `/` の処理内で実行します。記事の複数ルートに対応したローダー、ストリーム中に届く複数の GraphQL レスポンスの再生、未読レスポンスの30秒保持はありません。
+- **ワーカーのリソース監視と交換**: Watt のワーカーは2つ起動しますが、記事で紹介されたイベントループやメモリのしきい値に基づくワーカー交換は設定していません。
+- **XDS 全体と共有機能**: Base UI と Tailwind CSS は使用しますが、X のコンポーネントライブラリ XDS や、Module Federation で共有する Chat・Calls・Money は使用していません。
+- **ブラウザ・配信の性能最適化**: 記事の CSS 読み込み後に JavaScript を取得する処理、起動時チャンクの専用分割、翻訳カタログの削減、画像の WebP 配信、クローラー向け HTML の SVG スプライト化などは実装していません。非同期 module script によるシェルのハイドレーションは一部再現しています。
+- **性能計測基盤**: 記事の Lighthouse CI、実ユーザーの Core Web Vitals 収集、旧アプリとの比較計測はありません。現在の CI は型検査・lint・ビルドと Compose のスモークテストを実行します。
+- **エージェント向け開発基盤**: 記事の `AGENTS.md`、リポジトリ内スキル、独自 oxlint ルール、コミット・プッシュ時のフックは導入していません。型検査と lint には tsrs と oxlint を使います。
+
+PostgreSQL と Redis はこのサンプルで追加した保存先とキャッシュです。記事から X の採用構成を推定したものではありません。
+
 ## 起動
 
 Docker と Docker Compose を用意し、リポジトリのルートで次のコマンドを実行します。
@@ -81,7 +117,7 @@ sequenceDiagram
 ### Watt・Fastify: サーバーを動かし、リクエストを受ける
 
 - [Watt](https://docs.platformatic.dev/) は Node.js アプリケーションサーバーです。このサンプルでは Fastify アプリケーションを2つのワーカースレッドで動かし、ワーカーの起動や終了を管理します。設定は `apps/web/watt.json`、コンテナ内で使うランタイム・ワーカーのバンドル処理は `apps/web/scripts/build-watt.mjs` にあります。
-- [Fastify](https://fastify.dev/) は Node.js の Web フレームワークです。Watt のワーカー内で HTTP リクエストを受け、`/` の SSR、`/health`、静的アセット配信などを担当します。ルートやプラグインの登録は `apps/web/src/server.tsx` にあります。
+- [Fastify](https://fastify.dev/) は Node.js の Web フレームワークです。Watt のワーカー内で HTTP リクエストを受け、`/` の SSR、`/health`、静的アセット配信などを担当します。共通初期化は `apps/web/src/server.tsx`、ルートごとの処理は `apps/web/src/routes/` にあります。
 
 Watt はアプリケーションを動かす側、Fastify は各 HTTP リクエストを処理する側です。
 
@@ -102,7 +138,7 @@ Watt はアプリケーションを動かす側、Fastify は各 HTTP リクエ�
 
 [React](https://react.dev/) はコンポーネントから UI を組み立てるライブラリです。同じコンポーネントを使い、サーバーでは `renderToPipeableStream` で HTML をストリーミングし、ブラウザでは `hydrateRoot` で表示済みの HTML を操作可能にします。`Suspense` は遅延クエリの結果が届くまで、その領域に待機表示を出します。
 
-主な画面は `apps/web/src/App.tsx`、サーバー描画は `apps/web/src/server.tsx`、ブラウザでのハイドレーションは `apps/web/src/entry-client.tsx` にあります。
+主な画面は `apps/web/src/App.tsx`、サーバー描画は `apps/web/src/routes/home.tsx`、ブラウザでのハイドレーションは `apps/web/src/entry-client.tsx` にあります。
 
 ### Vite・Rolldown: 実行用のコードをビルドする
 
@@ -123,7 +159,8 @@ DB 接続と SQL、キャッシュの取得・無効化は `packages/database/sr
 
 ## コードの場所
 
-- `apps/web/src/server.tsx`: Fastify、GraphQL、初期データ取得とストリーミング SSR
+- `apps/web/src/server.tsx`: Fastify の共通初期化とルートの登録
+- `apps/web/src/routes/`: ホーム、ヘルスチェック、GraphQL、静的アセットの各ルート
 - `apps/web/src/relay.ts`: Relay 環境とサーバーレスポンスのストアへの投入
 - `apps/web/src/App.tsx`: ページ、Suspense、集計表示
 - `apps/web/src/PostCard.tsx`: Relay フラグメントといいね mutation

@@ -42,7 +42,7 @@ export function createRelayEnvironment(initialData?: GraphQLResponse) {
     }),
     store: new Store(new RecordSource()),
   });
-  // SSR で取得したデータを Relay ストアに投入し、初回クエリの重複を防ぐ。
+  // 記事のレスポンス再利用に倣い、初期データをストアに投入して重複取得を防ぐ。
   if (initialData && "data" in initialData && initialData.data) {
     environment.commitPayload(
       createOperationDescriptor(getRequest(HomeQuery), {}),

@@ -16,7 +16,7 @@ const initialPosts =
   "data" in response && response.data && Array.isArray(response.data.posts)
     ? response.data.posts.length
     : 0;
-// ストリームの完了を待って遅延領域の成功・失敗を引き継ぎ、同じクエリの再実行を避ける。
+// 記事の段階的なハイドレーションを簡略化し、遅延領域は文書の完了後に結果を引き継ぐ。
 const ready = new Promise<number>((resolve) => {
   const finish = () =>
     resolve(document.querySelector('[data-stream-error="true"]') ? -1 : initialPosts);
