@@ -54,6 +54,22 @@ jobs:
           grep -q 'Sora Tanaka' /tmp/town-square-page.html
           grep -q 'Stream complete' /tmp/town-square-page.html
 
+          python3 - <<'PY'
+          import http.client
+          import time
+
+          connection = http.client.HTTPConnection('127.0.0.1', 3000, timeout=30)
+          connection.request('GET', '/')
+          response = connection.getresponse()
+          first = response.read1(1)
+          first_at = time.monotonic()
+          body = first + response.read()
+          elapsed = time.monotonic() - first_at
+          assert response.status == 200 and b'Stream complete' in body
+          assert elapsed > 0.3, f'HTML was not streamed progressively: {elapsed:.2f}s'
+          connection.close()
+          PY
+
           graphql() {
             curl --fail --silent --show-error -H 'content-type: application/json' \
               --data "$1" "$base_url/graphql"

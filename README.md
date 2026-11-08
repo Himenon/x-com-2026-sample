@@ -36,7 +36,7 @@ X の技術スタックを参考にした、1 ページの実装サンプルで�
 - **性能計測基盤**: 記事の Lighthouse CI、実ユーザーの Core Web Vitals 収集、旧アプリとの比較計測はありません。現在の CI は型検査・lint・ビルドと Compose のスモークテストを実行します。
 - **エージェント向け開発基盤**: 記事の `AGENTS.md`、リポジトリ内スキル、独自 oxlint ルール、コミット・プッシュ時のフックは導入していません。型検査と lint には tsrs と oxlint を使います。
 
-PostgreSQL と Redis はこのサンプルで追加した保存先とキャッシュです。記事から X の採用構成を推定したものではありません。
+nginx はリバースプロキシの動作を確認するために追加したものです。記事のエッジでの振り分けや X の実際のプロキシ構成を再現したものではありません。PostgreSQL と Redis もこのサンプルで追加した保存先とキャッシュです。
 
 ## 起動
 
@@ -46,7 +46,7 @@ Docker と Docker Compose を用意し、リポジトリのルートで次のコ
 docker compose up --build
 ```
 
-起動後、`http://localhost:3000` を開きます。初回の PostgreSQL 起動時には、`docker/postgres/001-init.sql` がスキーマとサンプルデータを作成します。
+起動後、`http://localhost:3000` を開きます。nginx がポート 3000 でリクエストを受け、Compose 内の Web サービスへ転送します。Web のポートはホストに公開しません。nginx は `proxy_buffering off` により、React が生成した HTML を順次ブラウザへ転送します。初回の PostgreSQL 起動時には、`docker/postgres/001-init.sql` がスキーマとサンプルデータを作成します。
 
 データを維持したまま停止するには `docker compose down`、データも消して初期化し直すには `docker compose down -v` を実行します。
 
@@ -63,13 +63,15 @@ sequenceDiagram
     autonumber
     actor User as ユーザー
     participant Browser as ブラウザ
+    participant Proxy as nginx<br/>リバースプロキシ
     participant Watt as Watt ランタイム
     participant Web as Web ワーカー<br/>Fastify / GraphQL / React
     participant DB as PostgreSQL
     participant Redis as Redis
 
     User->>Browser: / を開く
-    Browser->>Watt: GET /
+    Browser->>Proxy: GET /
+    Proxy->>Watt: GET / を転送
     Watt->>Web: ワーカーに処理を割り当てる
     Note over Web: 1.5 秒後に実行する<br/>遅延クエリのタイマーを開始
     Web->>Web: Relay の HomeQuery を<br/>GraphQL として実行
@@ -85,25 +87,29 @@ sequenceDiagram
         Web->>Redis: 集計値を 60 秒間保存
     end
     Web->>Web: GraphQL レスポンスを<br/>サーバー側 Relay ストアに投入
-    Web-->>Browser: HTML の先頭と初期データを送信
-    Web-->>Browser: React のシェルと<br/>Suspense の待機表示を送信
+    Web-->>Proxy: HTML の先頭と初期データ、<br/>React のシェルと待機表示を送信
+    Proxy-->>Browser: 受信した HTML を順次転送
     par ブラウザ側の処理
-        Browser->>Watt: CSS・JavaScript を要求
+        Browser->>Proxy: CSS・JavaScript を要求
+        Proxy->>Watt: アセットの要求を転送
         Watt->>Web: アセットの要求を転送
-        Web-->>Browser: ビルド済み CSS・JavaScript
+        Web-->>Proxy: ビルド済み CSS・JavaScript
+        Proxy-->>Browser: アセットを転送
         Browser->>Browser: 初期データを Relay ストアに投入し、<br/>表示済み HTML のハイドレーションを開始
     and サーバー側の遅延処理
         Note over Web: タイマー開始から約 1.5 秒後
         Web->>Web: 遅延クエリを GraphQL で実行
         Web->>DB: 投稿を取得
         DB-->>Web: 投稿
-        Web-->>Browser: Suspense 領域の HTML を追加送信
+        Web-->>Proxy: Suspense 領域の HTML を追加送信
+        Proxy-->>Browser: 追加の HTML を転送
     end
-    Web-->>Browser: HTML ストリームを完了
+    Web-->>Proxy: HTML ストリームを完了
+    Proxy-->>Browser: 応答を完了
     Browser->>Browser: 遅延領域のハイドレーションを完了
 ```
 
-1. ブラウザが `/` を要求すると、Watt が Fastify のワーカーに処理を割り当てます。ワーカーは遅延表示用のタイマーを開始してから、初期表示用の `HomeQuery` を実行します。
+1. ブラウザが `/` を要求すると、nginx が Web に転送し、Watt が Fastify のワーカーに処理を割り当てます。ワーカーは遅延表示用のタイマーを開始してから、初期表示用の `HomeQuery` を実行します。
 2. GraphQL はプロフィールと投稿を PostgreSQL から取得します。集計値は Redis のバージョン付きキーを確認し、キャッシュがなければ PostgreSQL で集計して Redis に保存します。図では簡潔に順序を表していますが、GraphQL のフィールドは並行して解決される場合があります。
 3. サーバー側では GraphQL レスポンスを Relay ストアに投入し、初期データを安全にシリアライズして HTML に埋め込みます。React はシェルを先に描画し、遅延データを使う `Suspense` 領域には待機表示を出します。
 4. ブラウザは CSS と JavaScript を読み込み、HTML に埋め込まれたレスポンスを Relay ストアに再投入します。これにより初期表示のデータを `/graphql` に再要求せず、シェルのハイドレーションを開始できます。タイマー完了後には、サーバーが遅延クエリを実行し、その結果を使う領域の HTML を同じ応答に追加します。ブラウザは文書の完了後に遅延領域の成功・失敗を判定し、その領域のハイドレーションを完了します。
@@ -113,6 +119,10 @@ sequenceDiagram
 ## 主なライブラリと責務
 
 各技術の役割と、このサンプルでの使い方を説明します。リクエストを受ける Watt・Fastify、データを扱う GraphQL・Relay、画面を描画する React の順にコードを追えます。
+
+### nginx: リクエストを Web に転送する
+
+[nginx](https://nginx.org/) は、ブラウザからの HTTP リクエストを Web サービスへ転送するリバースプロキシです。`docker/nginx/default.conf` で転送先とヘッダーを設定し、レスポンスのバッファリングを無効にしてストリーミング SSR を通します。
 
 ### Watt・Fastify: サーバーを動かし、リクエストを受ける
 
@@ -159,6 +169,8 @@ DB 接続と SQL、キャッシュの取得・無効化は `packages/database/sr
 
 ## コードの場所
 
+- `docker/nginx/default.conf`: nginx の転送先とストリーミング設定
+- `compose.yaml`: nginx、Web、PostgreSQL、Redis の構成
 - `apps/web/src/server.tsx`: Fastify の共通初期化とルートの登録
 - `apps/web/src/routes/`: ホーム、ヘルスチェック、GraphQL、静的アセットの各ルート
 - `apps/web/src/relay.ts`: Relay 環境とサーバーレスポンスのストアへの投入

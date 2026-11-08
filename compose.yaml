@@ -1,8 +1,24 @@
 services:
+  proxy:
+    image: nginx:alpine
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        DNS_RESOLVER=$$(awk '/^nameserver/ {print $$2; exit}' /etc/resolv.conf)
+        export DNS_RESOLVER
+        exec /docker-entrypoint.sh nginx -g 'daemon off;'
+    environment:
+      NGINX_ENVSUBST_FILTER: ^DNS_RESOLVER$$
+    ports:
+      - "3000:80"
+    volumes:
+      - ./docker/nginx/default.conf:/etc/nginx/templates/default.conf.template:ro
+    depends_on:
+      web:
+        condition: service_healthy
+    restart: unless-stopped
   web:
     build: .
-    ports:
-      - "3000:3000"
     environment:
       PORT: 3000
       DATABASE_URL: postgres://sample:sample@postgres:5432/sample
@@ -12,6 +28,17 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
     restart: unless-stopped
   postgres:
     image: postgres:17-alpine
