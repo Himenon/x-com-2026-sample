@@ -9,6 +9,12 @@
   },
   "runtime": {
     "workers": 2,
+    "metrics": {
+      "port": 9090,
+      "hostname": "0.0.0.0",
+      "aggregateWorkers": false,
+      "resetHttpMetrics": false
+    },
     "telemetry": {
       "enabled": false,
       "applicationName": "town-square-sample"

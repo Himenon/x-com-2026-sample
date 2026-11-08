@@ -50,6 +50,22 @@ docker compose up --build
 
 データを維持したまま停止するには `docker compose down`、データも消して初期化し直すには `docker compose down -v` を実行します。
 
+### Watt のメトリクスを見る
+
+Compose は Web と一緒に Prometheus と Grafana を起動します。Prometheus が Watt の `/metrics` を 5 秒ごとに取得・保存し、Grafana がそのデータを表示します。メトリクスのポートは Compose 内だけで公開します。
+
+1. `http://127.0.0.1:3000/` を開いてリクエストを発生させます。
+2. `http://127.0.0.1:3001/` で Grafana に `admin` / `admin` でログインします。初回のパスワード変更画面では変更するか、ローカル検証用としてスキップできます。
+3. Dashboards から **Watt メトリクス** を開きます。Prometheus のデータソースとダッシュボードは起動時に自動登録されます。
+
+ダッシュボードでは、ワーカー別のイベントループ使用率・遅延、CPU、ヒープと、プロセス全体のメモリ、HTTP リクエスト数・応答時間を確認できます。ワーカー ID は `workerId` ラベルで区別します。応答時間やリクエスト数のグラフは、データが数回収集されるまで表示されない場合があります。画面のアクセス数が少ないと両ワーカーに均等に届くとは限りません。
+
+Watt の `resetHttpMetrics: false` は、HTTP 指標を取得のたびにリセットせず累積させる設定です。Prometheus は累積カウンターの増分から、リクエスト数や応答時間を計算します。
+
+Prometheus の画面は `http://127.0.0.1:9090/` です。**Status → Target health** で `watt` が UP になっているか確認できます。Grafana と Prometheus はホストのループバックアドレスにだけ公開し、メトリクスは nginx を経由しません。初期認証情報はローカル検証用です。PostgreSQL・Redis・nginx 自体の詳細なメトリクスは収集していません。
+
+`docker compose down -v` は PostgreSQL に加え、Prometheus の時系列データと Grafana の保存データも削除します。
+
 ローカルビルドには Node.js 26 と pnpm 12 が必要です。`pnpm install` と `pnpm build` でビルドできます。ローカルで Web を Watt 経由で起動する場合は、`DATABASE_URL`、`REDIS_URL`、`PORT` を設定して `pnpm dev` を実行してください。
 
 Compose では Watt のランタイム、ワーカー、Service をバンドルし、Fastify をワーカー上で起動します。実行用イメージには Rolldown のビルド成果物だけを含めます。サーバービルド時は、生成されたチャンクに Node.js 組み込みモジュール以外の外部 import が残らないよう検査します。

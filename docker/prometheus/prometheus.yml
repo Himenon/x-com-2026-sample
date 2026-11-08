@@ -1,0 +1,7 @@
+global:
+  scrape_interval: 5s
+
+scrape_configs:
+  - job_name: watt
+    static_configs:
+      - targets: ["web:9090"]
